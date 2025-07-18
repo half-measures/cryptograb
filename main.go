@@ -12,7 +12,6 @@ import (
 
 //Idea is to display BTC price in the CLI. Maybe expand to display any instruments price.
 
-// var api_key string = "TvLUmrFcck1z8LytcAMIuTWc1w7iXyBr"
 var authtestsuccesscode int = 0 //0 means nogo, 1 means successful
 var apitesturl string           //Set in Init function, will hold our secret
 var stockpickclean string = ""  //not used globally, just used to pass right now
