@@ -13,12 +13,20 @@ import (
 //Idea is to display BTC price in the CLI. Maybe expand to display any instruments price.
 
 var authtestsuccesscode int = 0 //0 means nogo, 1 means successful
-var apitesturl string           //Set in Init function, will hold our secret
+var apitesturl string           //Set in Init function, will hold our secret key and be used to check
 var stockpickclean string = ""  //not used globally, just used to pass right now
 var cfg config                  //global variable to hold our config API
 
 type config struct {
 	APIkey string `json:"apikey"` //Needs to be uppercase as lower means unexported field
+}
+type tickerdetailsresponse struct {
+	Results tickerdetails `json:"results"`
+	Status  string        `json:"status"` //OK or NOT_FOUND
+}
+type tickerdetails struct {
+	Ticker string `json:"ticker"`
+	Name   string `json:"name"`
 }
 
 func init() {
@@ -105,14 +113,48 @@ func userinput() {
 	}
 	yesnocheck := strings.TrimSpace(inputcheck)
 	if strings.ToUpper(yesnocheck) == "Y" {
-		isstockvalid(stockpickclean) //Pass value of cleaned stockpick elsewhere
+		getstock(stockpickclean) //Pass value of cleaned stockpick elsewhere
 	} else {
 		fmt.Println("Re-enter the ticker")
 		userinput()
 	}
 }
 
-func isstockvalid(stockpickclean string) {
-	fmt.Printf("Coming home. Validating stock: %s using API Key: %s...\n", stockpickclean, cfg.APIkey+"...")
+func getstock(stockpickclean string) {
+	fmt.Printf("Coming home. getting stock: %s using API Key: %s...\n", stockpickclean, cfg.APIkey+"...")
+	//How would we check to see if a stock is a real stock or instrument? The eternal battle rages on
+
+	ticketoverviewURL := fmt.Sprintf("https://api.polygon.io/v3/reference/tickers/%s?apiKey=%s", stockpickclean, cfg.APIkey)
+
+	resp, err := http.Get(ticketoverviewURL)
+	if err != nil {
+		fmt.Printf("Error getting stock info for %s: %v\n", stockpickclean, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading body for %s: %v\n", stockpickclean, err)
+		return
+	}
+
+	var tickerresponse tickerdetailsresponse
+	err = json.Unmarshal(body, &tickerresponse)
+	if err != nil {
+		fmt.Printf("Error parsing JSON response for %s: %v\n", stockpickclean, err)
+		fmt.Printf("Raw response: %s\n", string(body)) //printing raw body just in case
+		return
+	}
+	if tickerresponse.Status == "OK" && tickerresponse.Results.Ticker != "" {
+		fmt.Printf("\n--- Stock Information for %s ---\n", &tickerresponse.Results.Ticker)
+		fmt.Printf("Company name: %s\n", &tickerresponse.Results.Name)
+		fmt.Printf(ticketoverviewURL) //test
+
+	} else if tickerresponse.Status == "NOT_FOUND" {
+		fmt.Printf("Error: Financial Instrument '%s' not found or data found.\n", stockpickclean)
+	} else {
+		fmt.Printf("Could not retrieve '%s'. Status: %s\n", stockpickclean, &tickerresponse.Status)
+	}
 
 }
